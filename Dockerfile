@@ -1,4 +1,4 @@
-FROM python:3.11.1-slim
+FROM dhi.io/pytorch:2.10-cuda12.8-cudnn9
 
 WORKDIR /
 
