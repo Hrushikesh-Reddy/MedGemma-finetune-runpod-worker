@@ -1,9 +1,8 @@
-import runpod, torch, requests, os
+import runpod, torch, os
 import transformers.integrations.peft
-from PIL import Image
-from transformers import pipeline, AutoProcessor
+from transformers import pipeline, AutoProcessor, AutoModelForImageTextToText
+from peft import PeftModel
 from huggingface_hub import login
-
 
 # --- WORKAROUND: Bypass the PEFT MoE conversion bug ---
 if not hasattr(transformers.integrations.peft, "_MOE_TARGET_MODULE_MAPPING"):
@@ -15,28 +14,36 @@ login(token=os.environ.get("HF_KEY"))
 
 def generate_prompt(text, image):
     messages = [{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": text},
-            ]}]
-    if image!=None:
+        "role": "user",
+        "content": [
+            {"type": "text", "text": text},
+        ]
+    }]
+    if image is not None:
         messages[0]["content"].append({"type": "image", "image": image})
     return messages
 
 # Load model once when worker starts
-
 base_model_id = "google/medgemma-4b-it"
 lora_adapter_path = "Hrushikesh-0000/medgemma-4b-it-sft-lora-MRI6k"
 
 processor = AutoProcessor.from_pretrained(base_model_id)
 
+# FIX 1: Load base model first, then apply LoRA adapter on top
+base_model = AutoModelForImageTextToText.from_pretrained(
+    base_model_id,
+    dtype=torch.bfloat16,  # FIX 2: use `dtype` instead of deprecated `torch_dtype`
+    device_map="cuda",
+)
+model = PeftModel.from_pretrained(base_model, lora_adapter_path)
+model.eval()
+
 pipe = pipeline(
     "image-text-to-text",
-    model=lora_adapter_path,
-    processor=processor,
-    device="cuda",
-    # Note: We omit device="cuda" here because device_map="cuda" handled it during model loading
-    torch_dtype=torch.bfloat16,
+    model=model,           # pass the already-loaded PEFT model
+    tokenizer=processor.tokenizer,
+    image_processor=processor.image_processor,
+    # no device= needed; model is already on CUDA via device_map above
 )
 
 pipe.model.generation_config.do_sample = False
