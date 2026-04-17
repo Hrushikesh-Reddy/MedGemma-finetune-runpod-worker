@@ -1,0 +1,8 @@
+runpod
+TRL==0.28.0
+Transformers==5.1.0
+Pytorch==2.8.0+cu128
+Datasets==4.5.0
+Tokenizers==0.22.2
+huggingface
+requests
