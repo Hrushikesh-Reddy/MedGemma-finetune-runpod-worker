@@ -1,7 +1,15 @@
 import runpod, torch, requests, os
+import transformers.integrations.peft
 from PIL import Image
 from transformers import pipeline, AutoProcessor
 from huggingface_hub import login
+
+
+# --- WORKAROUND: Bypass the PEFT MoE conversion bug ---
+if not hasattr(transformers.integrations.peft, "_MOE_TARGET_MODULE_MAPPING"):
+    transformers.integrations.peft._MOE_TARGET_MODULE_MAPPING = {}
+transformers.integrations.peft._MOE_TARGET_MODULE_MAPPING['llava'] = {}
+# ------------------------------------------------------
 
 login(token=os.environ.get("HF_KEY"))
 
